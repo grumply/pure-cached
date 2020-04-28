@@ -1,3 +1,4 @@
+{-# language BangPatterns, LambdaCase, RecordWildCards #-}
 module Pure.Cached (Cached,cache,forkCache,cached) where
 
 import Pure.Data.Time
