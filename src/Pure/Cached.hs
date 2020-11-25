@@ -19,31 +19,30 @@ cache_ :: Bool -> Duration -> IO a -> IO (Cached a)
 cache_ expensive d ma = do
   let 
     construct = do
-      !next <- (+ d) <$> time
-      !a    <- ma
-      pure (next,a)
+      next <- (+ d) <$> time
+      a    <- ma
+      next `seq` a `seq` pure (next,a)
 
   value <- newMVar =<< construct
   _value <- mkWeakMVar value (pure ())
 
-  let
-    monitor = do
-      delay d
-      mvalue <- deRefWeak _value
-      case mvalue of
-        Nothing -> pure ()
-        Just v -> do
-          !tma <- construct
-          swapMVar v tma
-
-          -- Does looping in this way actually discard 
-          -- our reference to v, as desired?
-          monitor
-
   when expensive $ void $ 
-    forkIO monitor
+    forkIO (monitor construct _value)
 
   pure Cached {..}
+  where
+    monitor c _v = go
+      where
+        go = do
+          delay d
+          mvalue <- deRefWeak _v
+          case mvalue of
+            Nothing -> pure ()
+            Just v -> do
+              ta <- c
+              swapMVar v ta
+              go
+
 
 -- | Construct a cached value. Use this method for
 -- values that are cheap to re-compute.
